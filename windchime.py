@@ -2,79 +2,76 @@
 """
 Created on Wed Aug 11 16:42:11 2021
 
-ver 0.1 - "Departure Cooperative" (Internal Beta)
-    - initial beta
-    - star script generator
-    
-ver 0.2 - "Frozen Ash" (Internal Beta)
-    - includes bedtools coveragebed generator
-    - includes coveragebed concatenator
+ver 0.3 - "Enjoy exaggerate" (Public beta) 11.21.2021
 
 Purpose: 
     1. generate a bash script for the preprocessing and alignment of 
 RNAseq data with UMIs.
     2. QC RNAseq data for duplicates using UMI and rRNA contamination
-    3. Parse the QC results into a user-friendly table
-
-Command format:
-    
-    To generate bash script (purposes 1,2):
-        python windchime_star.py -i ctrl_file.tab -o run_windchime_star.sh
-
-    To parse QC results into table (purpose 3)
-        [run from directory with the .log files]
-        python windchime_star.py --evaluate -i ctrl_file.tab -o stats_compiled.txt
+    3. Additional QC using UMI aware sequence rarefaction
+    4. Calculate read coverage for a given feature file
+    5. Combine coverage into a single table for downstream (ie DESeq2) analysis
 
 Control File format:
     Every control file must have the following information in the following format
     
     #data_type	variable	value
-    meta	set_name	Project_Windchime_HGG72DRXY
-    meta	data_dir	/scratch/cgsb/gencore/out/Gresham/2021-08-09_HGG72DRXY/merged/
-    meta	work_dir	/scratch/cgsb/gresham/LABSHARE/Data/HGG72DRXY/
-    meta	genome_fa	/scratch/ps163/Carolina_03_18_2021/ensembl_50/Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa
-    meta	genome_gtf	/scratch/ps163/Carolina_03_18_2021/ensembl_50/Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.gtf
-    meta	adapter_seq_R1	AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
-    meta	adapter_seq_R2	AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
-    meta	prefix	HGG72DRXY
-    sample	1657	1
+    meta	set_name	<string>
+    meta	data_dir	<path to fastq files>
+    meta	work_dir	<path to a 'temp' directory>
+    meta	output_dir	<path to a results directory>
+    meta	genome_fa	<path to a reference fasta file>
+    meta	genome_features	<path to a gff file>
+    meta	intron_max	<integer>
+    meta	adapter_seq_R1	<string>
+    meta	adapter_seq_R2	<string>
+    meta	prefix	<string>
+    meta	fastq_name_template	<string>
+    meta	qc_locus	<sting>
+    sample	<string>
+    sample	<string
     
-    meta data types
-    set_name = user defined value, will be the name of the results folder in the 'work_dir' directory
-    data_dir = location of the fastq files. These will be copied to the 'work_dir' directory - not edited directly
-    work_dir = location of all operations, final results are published in the 'processed' directory
-    genome_fa = location of the reference genome to align to
-    adapter_seq_R1, adapter_seq_R2 = adapters for trimming (currently only paired end is supported)
-    prefix = sequencer defined run name the prefixes the fastq file names 
-    
-    sample data types
-    All samples must be in the data_dir.
-    All samples must have a strain identifier (i.e. '1657') and a replicate (i.e '1') 
+Command format:
+    # generate Align script 
+    python windchime.py -a -i ctrl_file.tab -o run_windchime_star.sh
+    # run rarefaction
+    python windchime.py -r -i ctrl_file.tab
+    # evaluate qc
+    python windchime.py -e -i ctrl_file.tab -o evaluate_run.txt
+    # generate coverage script
+    python windchime.py -c -i ctrl_file.tab -o coverage_run.sh
+    # combine coverage data
+    python windchime.py -t -i ctrl_file.tab -o coverage_table.txt
 
 #
-python windchime.py -a -im 500 -i ctrl_file.tab -o run_windchime_star.sh
-python windchime.py -e -i ctrl_file.tab -o evaluate_run.txt
-python windchime.py -c -i ctrl_file.tab -o coverage_run.sh
-python windchime.py -t -i ctrl_file.tab -o coverage_table.txt
 
 @author: Pieter Spealman
 """
 
 import argparse
 import numpy as np
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
-#parser.add_argument('-c', '--use_command_file')
+# io
 parser.add_argument('-i', '--inputfile_name')
 parser.add_argument('-o', '--outfile_name')
-
+# options
+parser.add_argument('-mem', '--mem_in_GB')
+parser.add_argument('-rep', '--use_replicates', action='store_true')
+# functions
+parser.add_argument('-r', '--rarefaction', action='store_true')
 parser.add_argument('-a', '--align', action='store_true')
 parser.add_argument('-e', '--evaluate', action='store_true')
 parser.add_argument('-c', '--coverage', action='store_true')
 parser.add_argument('-t', '--table_coverage_build', action='store_true')
-parser.add_argument('-r', '--use_replicates', action='store_true')
 
-args = parser.parse_args()
+args = parser.parse_args()  
+
+if not args.mem_in_GB:
+    mem = 60
+else:
+    mem = int(args.mem_in_GB)
 
 def load_cmd_file():
     if args.inputfile_name:
@@ -92,6 +89,7 @@ def load_cmd_file():
                 'intron_max':'',
                 'adapter_seq_R1':'',
                 'adapter_seq_R2':'',
+                'fastq_name_template':'',
                 'prefix':'',
                 'qc_locus':'',
                 'samples':{},
@@ -125,6 +123,7 @@ def load_cmd_file():
                 'intron_max':'',
                 'adapter_seq_R1':'',
                 'adapter_seq_R2':'',
+                'fastq_name_template':'',
                 'prefix':'',
                 'qc_locus':'',
                 'samples':set(),
@@ -156,7 +155,7 @@ def load_cmd_file():
     
     else:
         print('Please specify a input control file')
-    
+            
 def make_text(cmd_dict):
     outfile_name = args.outfile_name
     outfile = open(outfile_name, 'w')
@@ -164,18 +163,16 @@ def make_text(cmd_dict):
     set_name = cmd_dict['set_name']
     qc_locus = cmd_dict['qc_locus']
     qc_text = qc_locus.replace(':','_')
-    
-    
-    
+        
     outline = ('#!/bin/bash\n'
                '#\n'
                '#SBATCH --verbose\n'
                '#SBATCH --job-name={set_name_py}_windchime\n'
                '#SBATCH --output={set_name_py}_windchime_%j.out\n'
                '#SBATCH --error={set_name_py}_windchime_%j.err\n'
-               '#SBATCH --time=24:00:00\n'
+               '#SBATCH --time=96:00:00\n'
                '#SBATCH --nodes=4\n'
-               '#SBATCH --mem=40GB\n'
+               '#SBATCH --mem={mem}GB\n'
                '# 11.04.21 Pieter Spealman \n'
                '#=============================\n'
                '# 0. Load Modules\n'
@@ -233,6 +230,7 @@ def make_text(cmd_dict):
                '# 4. Preprocess samples\n'
                '#=============================\n').format(
                    set_name_py=set_name,
+                   mem = mem,
                    adapter_seq_R1_py=cmd_dict['adapter_seq_R1'],
                    adapter_seq_R2_py=cmd_dict['adapter_seq_R2'],
                    prefix_py=cmd_dict['prefix'],
@@ -257,8 +255,8 @@ def make_text(cmd_dict):
                 else:
                     print('Error: icpy duplicate generated')
                     
-                input_file_R1_is = "${prefix}_n01_${strain}-${replicate}"
-                input_file_R2_is = "${prefix}_n02_${strain}-${replicate}"
+                input_file_R1_is = cmd_dict['fastq_name_template']
+                input_file_R2_is = cmd_dict['fastq_name_template'].replace('n01', 'n02')
                     
                 outline = ('#Preprocess_{icpy}\n'
                        '\tstrain={strain_py}\n'
@@ -315,8 +313,8 @@ def make_text(cmd_dict):
                 print('Error: icpy duplicate generated')
                 
             if not args.use_replicates:
-                input_file_R1_is = "${prefix}_n01_${strain}"
-                input_file_R2_is = "${prefix}_n02_${strain}"
+                input_file_R1_is = cmd_dict['fastq_name_template']
+                input_file_R2_is = cmd_dict['fastq_name_template'].replace('n01', 'n02')
                 
             outline = ('#Preprocess_{icpy}\n'
                        '\tstrain={strain_py}\n'
@@ -396,7 +394,7 @@ def make_text(cmd_dict):
                    '\t\tsamtools index {temp_QCname_py}.bam\n'
                    '\t\tsamtools view -b -h {temp_QCname_py}.bam "{qc_locus}" > {temp_QCname_py}_{qc_text}_output.bam'
                    '\t# output QC #\n'
-                   '\t\techo "total aligned:" > {temp_QCname_py}_stats.log\n'
+                   '\t\techo "total aligned:" > {temp_QCname_py}_total_stats.log\n'
                    '\t\tsamtools stats {temp_QCname_py}.sorted.bam >> {temp_QCname_py}_total_stats.log\n'
                    '\t\techo "total after deduplication of UMI:" > {temp_QCname_py}_dedup_stats.log\n'
                    '\t\tsamtools stats {temp_QCname_py}.bam >> {temp_QCname_py}_dedup_stats.log\n'
@@ -404,7 +402,8 @@ def make_text(cmd_dict):
                    '\t\tsamtools stats {temp_QCname_py}_{qc_text}_output.bam >> {temp_QCname_py}_{qc_text}_stats.log\n'
                    '\t# Clean up #\n'
                    '\t\tmv {temp_QCname_py}.bam* $Processed_dir/\n'
-                   '\t\tmv {temp_QCname_py}*.log $Processed_dir/\n').format(
+                   '\t\tmv {temp_QCname_py}*.log $Processed_dir/\n'
+                   '\t\tmv {temp_QCname_py}*.pdf $Processed_dir/\n').format(
                        icpy=icpy,
                        temp_QCname_py="${tmp_dir}/${QC_name}",
                        qc_locus=qc_locus,
@@ -412,7 +411,160 @@ def make_text(cmd_dict):
         outfile.write(outline)
     
     outfile.close()
+   
     
+def run_rarefaction(cmd_dict):
+    fastq_dir = ('{work_dir}/STAR_{set_name}/fastq').format(
+        work_dir = cmd_dict['work_dir'],
+        set_name = cmd_dict['set_name'])
+    
+    #Project_CAlbicans_Yujia_HK7CCDRXY-CAWT1_C-LIM_11H_1_umi.fastq
+    
+    if args.use_replicates:
+        for strain_py in cmd_dict['samples']:
+            for replicate_py in cmd_dict['samples'][strain_py]:
+                outfile_name = ('{}/{}-{}').format(cmd_dict['output_dir'],strain_py, replicate_py)
+                outfile = open(outfile_name+'.txt', 'w')
+                
+                read_ct = 0
+                new = 0
+                
+                collision_dict = {}
+                
+                x = []
+                y = []
+                
+                sample_1 = ('{work_dir}/STAR_{set_name}/fastq/{set_name}-{strain}-{replicate}').format(
+                    work_dir = cmd_dict['work_dir'],
+                    set_name = cmd_dict['set_name'],
+                    strain = cmd_dict['strain'],
+                    replicate = cmd_dict['replicate'])
+                
+                 # = ('{}').format(
+                 #    set_name=set_name,
+                 #    fastq_dir=fastq_dir, 
+                 #    strain_py=strain_py, 
+                 #    replicate_py = replicate_py)
+                
+                infile_1 = open(sample_1)
+                
+                ct = 0
+                
+                for line in infile_1:
+                    if (read_ct % 10000 == 0) and (ct == 0):
+                        outline = ('{}\t{}\n').format(read_ct, new)
+                        outfile.write(outline)
+                        #
+                        x.append(read_ct)
+                        y.append(new)
+                        
+                        
+                    if line[0]=='@' and ct == 0:
+                        read_ct += 1
+                        umi = line.split(' ')[0].split('_')[1]
+                        
+                    if ct == 1:
+                        seq = line.strip()
+                        
+                        if seq not in collision_dict:
+                            collision_dict[seq] = set()
+                            
+                        if umi not in collision_dict[seq]:
+                            new += 1
+                            collision_dict[seq].add(umi)
+                                                
+                    ct+=1
+                    
+                    if ct >= 4:
+                        umi=''
+                        seq=''
+                        ct = 0
+                
+                
+                infile_1.close()
+                outfile.close()
+                
+                plt.figure()
+                plt.plot(x,y)
+                plt.savefig(outfile_name + '.pdf')
+                plt.close()
+                plt.clf()
+                
+    if not args.use_replicates:
+        for strain_py in cmd_dict['samples']:
+            outfile_name = ('{}/{}').format(cmd_dict['output_dir'],strain_py)
+            outfile = open(outfile_name+'.txt', 'w')
+            
+            read_ct = 0
+            new = 0
+            
+            collision_dict = {}
+            
+            x = []
+            y = []
+            ideal_y = []
+            
+            print(strain_py)
+            
+            sample_1 = ('{fastq_dir}/Project_CAlbicans_Yujia_HK7CCDRXY-{strain_py}_1_umi.fastq').format(
+                #set_name=set_name,
+                fastq_dir=fastq_dir, 
+                strain_py=strain_py)
+                        
+            infile_1 = open(sample_1)
+            
+            ct = 0
+            halfline = [0,0]
+            
+            for line in infile_1:
+                if (read_ct % 10000 == 0) and (ct == 0):
+                    outline = ('{}\t{}\n').format(read_ct, new)
+                    outfile.write(outline)
+                    #
+                    x.append(read_ct)
+                    y.append(new)
+                    ideal_y.append(read_ct)
+                    
+                    if halfline == [0, 0]:
+                        if round(new/max(1,read_ct),1) == 50.0:
+                            halfline = [read_ct, new]
+                    
+                if line[0]=='@' and ct == 0:
+                    read_ct += 1
+                    umi = line.split(' ')[0].split('_')[1]
+                    
+                if ct == 1:
+                    seq = line.strip()
+                                        
+                    if seq not in collision_dict:
+                        collision_dict[seq] = set()
+                        
+                    if umi not in collision_dict[seq]:
+                        new += 1
+                        collision_dict[seq].add(umi)
+                                            
+                ct+=1
+                
+                if ct >= 4:
+                    umi=''
+                    seq=''
+                    ct = 0
+            
+            
+            infile_1.close()
+            outfile.close()
+            
+            plt.figure()
+            plt.plot(x,y)
+            plt.plot(x, ideal_y, 'r--')
+            plt.ylabel('Unique reads')
+            plt.xlabel('Sequenced reads')
+            plt.axhline(color='b', y=halfline[1])
+            plt.axvline(color='b', x=halfline[0])
+            plt.savefig(outfile_name + '.pdf')
+            plt.close()
+            plt.clf()
+                             
 def stats_parser(stat_file_name):
     print(stat_file_name)
     try:
@@ -433,14 +585,7 @@ def summarize_stats(cmd_dict):
     
     outfile_name = args.outfile_name
     outfile = open(outfile_name, 'w')
-    
-    header = ('Strain\tReplicate'
-              '\tTotal_reads'
-              '\tUMI_unique_reads\tUMI_unique_pct'
-              '\trRNA_reads\trRNA_pct\n')
-    print(header)
-    outfile.write(header)
-    
+        
     set_name = cmd_dict['set_name']
     output_dir = cmd_dict['output_dir']
     
@@ -448,6 +593,13 @@ def summarize_stats(cmd_dict):
     qc_text = qc_locus.replace(':','_')
     
     if args.use_replicates:
+        header = ('Strain\tReplicate'
+                  '\tTotal_reads'
+                  '\tUMI_unique_reads\tUMI_unique_pct'
+                  '\tQC_locus_reads\tQC_locus_pct\n')
+        print(header)
+        outfile.write(header)
+        
         for strain_py in cmd_dict['samples']:
             for replicate_py in cmd_dict['samples'][strain_py]:
                 print(strain_py, replicate_py)
@@ -489,6 +641,13 @@ def summarize_stats(cmd_dict):
                 outfile.write(outline)
         
     if not args.use_replicates:
+        header = ('Strain'
+                  '\tTotal_reads'
+                  '\tUMI_unique_reads\tUMI_unique_pct'
+                  '\tQC_locus_reads\tQC_locus_pct\n')
+        print(header)
+        outfile.write(header)
+        
         for strain_py in cmd_dict['samples']:
             print(strain_py)
             
@@ -536,11 +695,13 @@ def coverage_run(cmd_dict):
                '#SBATCH --job-name={set_name_py}_windchime\n'
                '#SBATCH --output={set_name_py}_windchime_%j.out\n'
                '#SBATCH --error={set_name_py}_windchime_%j.err\n'
-               '#SBATCH --time=24:00:00\n'
-               '#SBATCH --nodes=4\n'
-               '#SBATCH --mem=40GB\n'
+               '#SBATCH --time=96:00:00\n'
+               '#SBATCH --nodes=1\n'
+               '#SBATCH --mem={mem}GB\n'
                'module load bedtools/intel/2.29.2\n'
-               'module load samtools/intel/1.12\n')
+               'module load samtools/intel/1.12\n').format(
+                   mem = mem,
+                   set_name_py = cmd_dict['set_name'])
     outfile.write(header)
     
     genome_gtf = cmd_dict['genome_features']
@@ -576,7 +737,7 @@ def coverage_run(cmd_dict):
                     bam_file_name = bam_file_name,
                     tab_file_name = tab_file_name)
                  
-                print(outline)
+                #print(outline)
                 outfile.write(outline)
                 
     if not args.use_replicates:
@@ -600,7 +761,7 @@ def coverage_run(cmd_dict):
                   bam_file_name = bam_file_name,
                   tab_file_name = tab_file_name)
              
-            print(outline)
+            #print(outline)
             outfile.write(outline)
                 
     outfile.close()
@@ -744,6 +905,9 @@ cmd_dict, process = load_cmd_file()
 
 if process and args.align:
     make_text(cmd_dict)
+    
+if process and args.rarefaction:
+    run_rarefaction(cmd_dict)
 
 if args.evaluate:
     summarize_stats(cmd_dict)
@@ -753,7 +917,4 @@ if args.coverage:
     
 if args.table_coverage_build:
     build_coverage_table(cmd_dict)
-    
-    
-                    
-    
+   
