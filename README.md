@@ -1,14 +1,5 @@
----
-title: "Windchime pipeline"
-author: "Pieter Spealman"
-date: "11/21/2021"
-output: html_notebook
----
+### Windchime pipeline
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-```
 #### Purpose
 This pipeline is intended to: 
 
