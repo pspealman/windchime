@@ -2,7 +2,8 @@
 """
 Created on Wed Aug 11 16:42:11 2021
 
-ver 0.3 - "Enjoy exaggerate" (Public beta) 11.21.2021
+ver 0.31 - "Enjoy exaggerate" (Public beta) 11.21.2021
+    _x_ improved rarefaction plots
 
 Purpose: 
     1. generate a bash script for the preprocessing and alignment of 
@@ -53,12 +54,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
+
 # io
 parser.add_argument('-i', '--inputfile_name')
 parser.add_argument('-o', '--outfile_name')
+
 # options
 parser.add_argument('-mem', '--mem_in_GB')
+parser.add_argument('-tol', '--set_tolerance')
 parser.add_argument('-rep', '--use_replicates', action='store_true')
+
+
 # functions
 parser.add_argument('-r', '--rarefaction', action='store_true')
 parser.add_argument('-a', '--align', action='store_true')
@@ -68,10 +74,20 @@ parser.add_argument('-t', '--table_coverage_build', action='store_true')
 
 args = parser.parse_args()  
 
+# Handle default parameters
 if not args.mem_in_GB:
     mem = 60
 else:
     mem = int(args.mem_in_GB)
+    
+if not args.set_tolerance:
+    tol = 0.500
+else:
+    tol = float(args.set_tolerance)
+    if tol > 1:
+        tol /= 100
+        
+#
 
 def load_cmd_file():
     if args.inputfile_name:
@@ -412,19 +428,44 @@ def make_text(cmd_dict):
     
     outfile.close()
    
+def plot_rarefaction(x, y, ideal_y, halfline, outfile_name, sample_name):
+        
+    title_label = ('Rarefaction curve for {}').format(sample_name)
+    
+    axvh_label = ('{}% percent novel').format(tol*100)
+    plt.figure()
+    
+    plt.plot(x, y, label='Observed rarefaction')
+    plt.plot(x, ideal_y, 'r--', label='Ideal rarefaction')
+    
+    plt.title(title_label)
+    plt.ylabel('Unique reads')
+    plt.xlabel('Sequenced reads')
+    
+    hfy = halfline[1]
+    hfx = halfline[0]
+
+    plt.axhline(color='k', linewidth=0.5, y=hfy, label=axvh_label)
+    plt.axvline(color='k', linewidth=0.5, x=hfx)
+    
+    plt.legend()
+       
+    plt.savefig(outfile_name + '.pdf')
+    plt.close()
+    plt.clf()
     
 def run_rarefaction(cmd_dict):
     fastq_dir = ('{work_dir}/STAR_{set_name}/fastq').format(
         work_dir = cmd_dict['work_dir'],
         set_name = cmd_dict['set_name'])
     
-    #Project_CAlbicans_Yujia_HK7CCDRXY-CAWT1_C-LIM_11H_1_umi.fastq
-    
+    set_name = cmd_dict['set_name']
+        
     if args.use_replicates:
         for strain_py in cmd_dict['samples']:
             for replicate_py in cmd_dict['samples'][strain_py]:
                 outfile_name = ('{}/{}-{}').format(cmd_dict['output_dir'],strain_py, replicate_py)
-                outfile = open(outfile_name+'.txt', 'w')
+                #outfile = open(outfile_name+'.txt', 'w')
                 
                 read_ct = 0
                 new = 0
@@ -433,6 +474,10 @@ def run_rarefaction(cmd_dict):
                 
                 x = []
                 y = []
+                ideal_y = []
+                halfline = [0,0]
+                
+                print('Processing: ')
                 
                 sample_1 = ('{work_dir}/STAR_{set_name}/fastq/{set_name}-{strain}-{replicate}').format(
                     work_dir = cmd_dict['work_dir'],
@@ -440,24 +485,24 @@ def run_rarefaction(cmd_dict):
                     strain = cmd_dict['strain'],
                     replicate = cmd_dict['replicate'])
                 
-                 # = ('{}').format(
-                 #    set_name=set_name,
-                 #    fastq_dir=fastq_dir, 
-                 #    strain_py=strain_py, 
-                 #    replicate_py = replicate_py)
-                
+                print(sample_1)
+                                
                 infile_1 = open(sample_1)
                 
                 ct = 0
                 
                 for line in infile_1:
                     if (read_ct % 10000 == 0) and (ct == 0):
-                        outline = ('{}\t{}\n').format(read_ct, new)
-                        outfile.write(outline)
+                        #outline = ('{}\t{}\n').format(read_ct, new)
+                        #outfile.write(outline)
                         #
                         x.append(read_ct)
                         y.append(new)
+                        ideal_y.append(read_ct)
                         
+                        if halfline == [0, 0]:
+                            if round(new/max(1,read_ct),3) == tol:
+                                halfline = [read_ct, new]                       
                         
                     if line[0]=='@' and ct == 0:
                         read_ct += 1
@@ -482,18 +527,19 @@ def run_rarefaction(cmd_dict):
                 
                 
                 infile_1.close()
-                outfile.close()
+                #outfile.close()
                 
-                plt.figure()
-                plt.plot(x,y)
-                plt.savefig(outfile_name + '.pdf')
-                plt.close()
-                plt.clf()
+                sample_name = ('{strain}-{replicate}').format(
+                    strain = cmd_dict['strain'],
+                    replicate = cmd_dict['replicate'])
+                
+                plot_rarefaction(x, y, ideal_y, halfline, outfile_name, sample_name)
+
                 
     if not args.use_replicates:
         for strain_py in cmd_dict['samples']:
             outfile_name = ('{}/{}').format(cmd_dict['output_dir'],strain_py)
-            outfile = open(outfile_name+'.txt', 'w')
+            #outfile = open(outfile_name+'.txt', 'w')
             
             read_ct = 0
             new = 0
@@ -503,31 +549,33 @@ def run_rarefaction(cmd_dict):
             x = []
             y = []
             ideal_y = []
+            halfline = [0,0]
             
-            print(strain_py)
+            print('Processing: ')
             
-            sample_1 = ('{fastq_dir}/Project_CAlbicans_Yujia_HK7CCDRXY-{strain_py}_1_umi.fastq').format(
-                #set_name=set_name,
+            sample_1 = ('{fastq_dir}/{set_name}-{strain_py}_1_umi.fastq').format(
+                set_name=set_name,
                 fastq_dir=fastq_dir, 
                 strain_py=strain_py)
+            
+            print(sample_1)
                         
             infile_1 = open(sample_1)
             
             ct = 0
-            halfline = [0,0]
             
             for line in infile_1:
                 if (read_ct % 10000 == 0) and (ct == 0):
-                    outline = ('{}\t{}\n').format(read_ct, new)
-                    outfile.write(outline)
+                    #outline = ('{}\t{}\n').format(read_ct, new)
+                    #outfile.write(outline)
                     #
                     x.append(read_ct)
                     y.append(new)
                     ideal_y.append(read_ct)
                     
                     if halfline == [0, 0]:
-                        if round(new/max(1,read_ct),1) == 50.0:
-                            halfline = [read_ct, new]
+                        if round(new/max(1,read_ct),3) == tol:
+                            halfline = [read_ct, new]                           
                     
                 if line[0]=='@' and ct == 0:
                     read_ct += 1
@@ -552,19 +600,10 @@ def run_rarefaction(cmd_dict):
             
             
             infile_1.close()
-            outfile.close()
+            #outfile.close()
             
-            plt.figure()
-            plt.plot(x,y)
-            plt.plot(x, ideal_y, 'r--')
-            plt.ylabel('Unique reads')
-            plt.xlabel('Sequenced reads')
-            plt.axhline(color='b', y=halfline[1])
-            plt.axvline(color='b', x=halfline[0])
-            plt.savefig(outfile_name + '.pdf')
-            plt.close()
-            plt.clf()
-                             
+            plot_rarefaction(x, y, ideal_y, halfline, outfile_name, strain_py)
+                                         
 def stats_parser(stat_file_name):
     print(stat_file_name)
     try:
@@ -917,4 +956,3 @@ if args.coverage:
     
 if args.table_coverage_build:
     build_coverage_table(cmd_dict)
-   
