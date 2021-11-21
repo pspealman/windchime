@@ -149,7 +149,7 @@ python windchime.py -r -i ctrl_file.tab
 * The above code will perform a rarefaction calculation using the combination of
 UMI an aligned sequence. All rarefaction is calculated using random downsampling. 
 * This command will produce rarefaction curves saved as .pdf files in the __output_dir__ directory specified in the configuration file.
-![Rarefaction curve](images/example.png)
+![Rarefaction curve](https://user-images.githubusercontent.com/32845376/142782607-3a39e7ca-02f8-4bd0-ac3d-c7654a870237.png)
 * The plot will show both the __ideal case__ (red, dashed line), the __observed case__ (blue solid curve), and the approximate __tolerance point__ if present (black solid lines). 
 * The tolerance point, by default 50%, is the point at which the rate of adding a novel sequence drops below 50% (this can be changed by using the __-tol__ parameter). In the above example, a 75% tolerance point is crossed very early in the run (~0.7e8 reads). 
 
