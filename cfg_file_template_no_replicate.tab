@@ -9,7 +9,7 @@ meta	intron_max	nucleotide_length_(integers)
 meta	adapter_seq_R1	AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
 meta	adapter_seq_R2	AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 meta	prefix	run_id
-meta	fastq_name_template	{prefix}_n01_{strain}
+meta	fastq_name_template	${prefix}_n01_${strain}
 meta	qc_locus	chromo:start-stop
 sample	sample_name_1
 sample	sample_name_2
