@@ -4,6 +4,7 @@ Created on Wed Aug 11 16:42:11 2021
 
 ver 0.31 - "Enjoy exaggerate" (Public beta) 11.21.2021
     _x_ improved rarefaction plots
+    01.05.2022 - remove 'mv *.pdf' from clean up step
 
 Purpose: 
     1. generate a bash script for the preprocessing and alignment of 
@@ -408,7 +409,7 @@ def make_text(cmd_dict):
                    '\t\tumi_tools dedup -I {temp_QCname_py}.sorted.bam --output-stats={temp_QCname_py}.deduplicated -S {temp_QCname_py}.bam\n'
                    '\t#\n'
                    '\t\tsamtools index {temp_QCname_py}.bam\n'
-                   '\t\tsamtools view -b -h {temp_QCname_py}.bam "{qc_locus}" > {temp_QCname_py}_{qc_text}_output.bam'
+                   '\t\tsamtools view -b -h {temp_QCname_py}.bam "{qc_locus}" > {temp_QCname_py}_{qc_text}_output.bam\n'
                    '\t# output QC #\n'
                    '\t\techo "total aligned:" > {temp_QCname_py}_total_stats.log\n'
                    '\t\tsamtools stats {temp_QCname_py}.sorted.bam >> {temp_QCname_py}_total_stats.log\n'
@@ -419,7 +420,7 @@ def make_text(cmd_dict):
                    '\t# Clean up #\n'
                    '\t\tmv {temp_QCname_py}.bam* $Processed_dir/\n'
                    '\t\tmv {temp_QCname_py}*.log $Processed_dir/\n'
-                   '\t\tmv {temp_QCname_py}*.pdf $Processed_dir/\n').format(
+                   ).format(
                        icpy=icpy,
                        temp_QCname_py="${tmp_dir}/${QC_name}",
                        qc_locus=qc_locus,
@@ -465,7 +466,6 @@ def run_rarefaction(cmd_dict):
         for strain_py in cmd_dict['samples']:
             for replicate_py in cmd_dict['samples'][strain_py]:
                 outfile_name = ('{}/{}-{}').format(cmd_dict['output_dir'],strain_py, replicate_py)
-                #outfile = open(outfile_name+'.txt', 'w')
                 
                 read_ct = 0
                 new = 0
@@ -493,9 +493,6 @@ def run_rarefaction(cmd_dict):
                 
                 for line in infile_1:
                     if (read_ct % 10000 == 0) and (ct == 0):
-                        #outline = ('{}\t{}\n').format(read_ct, new)
-                        #outfile.write(outline)
-                        #
                         x.append(read_ct)
                         y.append(new)
                         ideal_y.append(read_ct)
@@ -524,10 +521,8 @@ def run_rarefaction(cmd_dict):
                         umi=''
                         seq=''
                         ct = 0
-                
-                
+                                
                 infile_1.close()
-                #outfile.close()
                 
                 sample_name = ('{strain}-{replicate}').format(
                     strain = cmd_dict['strain'],
@@ -539,7 +534,6 @@ def run_rarefaction(cmd_dict):
     if not args.use_replicates:
         for strain_py in cmd_dict['samples']:
             outfile_name = ('{}/{}').format(cmd_dict['output_dir'],strain_py)
-            #outfile = open(outfile_name+'.txt', 'w')
             
             read_ct = 0
             new = 0
@@ -566,9 +560,6 @@ def run_rarefaction(cmd_dict):
             
             for line in infile_1:
                 if (read_ct % 10000 == 0) and (ct == 0):
-                    #outline = ('{}\t{}\n').format(read_ct, new)
-                    #outfile.write(outline)
-                    #
                     x.append(read_ct)
                     y.append(new)
                     ideal_y.append(read_ct)
@@ -598,9 +589,7 @@ def run_rarefaction(cmd_dict):
                     seq=''
                     ct = 0
             
-            
             infile_1.close()
-            #outfile.close()
             
             plot_rarefaction(x, y, ideal_y, halfline, outfile_name, strain_py)
                                          
@@ -663,7 +652,6 @@ def summarize_stats(cmd_dict):
                 total_reads_py = stats_parser(total_file_name)
                 umi_reads_py = stats_parser(dedup_file_name)
                 rrna_reads_py = stats_parser(rrna_file_name)
-                
                 
                 outline = ('{strain}\t{replicate}'
                               '\t{total_reads}'
@@ -748,10 +736,7 @@ def coverage_run(cmd_dict):
     set_name = cmd_dict['set_name']
     
     output_dir_py=cmd_dict['output_dir']
-    
-    #qc_locus = cmd_dict['qc_locus']
-    #qc_text = qc_locus.replace(':','_')
-    
+        
     if args.use_replicates:
         for strain_py in cmd_dict['samples']:
             for replicate_py in cmd_dict['samples'][strain_py]:
@@ -776,7 +761,6 @@ def coverage_run(cmd_dict):
                     bam_file_name = bam_file_name,
                     tab_file_name = tab_file_name)
                  
-                #print(outline)
                 outfile.write(outline)
                 
     if not args.use_replicates:
@@ -800,7 +784,6 @@ def coverage_run(cmd_dict):
                   bam_file_name = bam_file_name,
                   tab_file_name = tab_file_name)
              
-            #print(outline)
             outfile.write(outline)
                 
     outfile.close()
@@ -956,3 +939,7 @@ if args.coverage:
     
 if args.table_coverage_build:
     build_coverage_table(cmd_dict)
+    
+    
+                    
+    
