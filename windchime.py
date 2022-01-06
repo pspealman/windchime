@@ -4,7 +4,9 @@ Created on Wed Aug 11 16:42:11 2021
 
 ver 0.31 - "Enjoy exaggerate" (Public beta) 11.21.2021
     _x_ improved rarefaction plots
-    01.05.2022 - remove 'mv *.pdf' from clean up step
+ver 0.32 - "Implicit tail" (Public beta) 01.05.2021
+    _x_ remove mv command
+    _x_ corrected 'strain' error on replicates run
 
 Purpose: 
     1. generate a bash script for the preprocessing and alignment of 
@@ -482,7 +484,7 @@ def run_rarefaction(cmd_dict):
                 sample_1 = ('{work_dir}/STAR_{set_name}/fastq/{set_name}-{strain}-{replicate}').format(
                     work_dir = cmd_dict['work_dir'],
                     set_name = cmd_dict['set_name'],
-                    strain = cmd_dict['strain'],
+                    strain = strain_py,
                     replicate = cmd_dict['replicate'])
                 
                 print(sample_1)
@@ -525,7 +527,7 @@ def run_rarefaction(cmd_dict):
                 infile_1.close()
                 
                 sample_name = ('{strain}-{replicate}').format(
-                    strain = cmd_dict['strain'],
+                    strain = strain_py,
                     replicate = cmd_dict['replicate'])
                 
                 plot_rarefaction(x, y, ideal_y, halfline, outfile_name, sample_name)
