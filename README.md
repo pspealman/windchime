@@ -74,7 +74,7 @@ meta	intron_max	100
 meta	adapter_seq_R1	AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
 meta	adapter_seq_R2	AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 meta	prefix	HGG72DRXY
-meta	fastq_name_template	{prefix}_n01_{strain}_{replicate}
+meta	fastq_name_template	${prefix}_n01_${strain}_${replicate}
 meta	qc_locus  XII:451439-468985
 sample	1	1
 sample	1	2
@@ -97,7 +97,7 @@ meta	intron_max	500
 meta	adapter_seq_R1	AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
 meta	adapter_seq_R2	AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 meta	prefix	HK7CCDRXY
-meta	fastq_name_template	{prefix}_n01_{strain}
+meta	fastq_name_template	${prefix}_n01_${strain}
 meta	qc_locus	Ca22chrRA_C_albicans_SC5314:1891108-1896912
 sample	CAWT1_C-LIM_2H
 sample	CAWT1_C-LIM_5H
