@@ -106,7 +106,7 @@ sample	CAWT1_C-LIM_5H
 ```
 python windchime.py -a -i cfg_file.tab -o run_windchime_star.sh
 # -a 'alignment' flag
-# [optional] -rep flag, include if you ar using replicates
+# [optional] -rep flag, include if you are using replicates
 # [optional] -mem flag, set sbatch memory allocation in GB. (Default 60GB)
 # -i input configuration file name
 # -o output STAR sbatch file name
@@ -120,7 +120,7 @@ sbatch run_windchime_star.sh
 ```
 python windchime.py -e -i cfg_file.tab -o evaluate_run.txt
 # -e 'evaluate' flag
-# [optional] -rep flag, include if you ar using replicates
+# [optional] -rep flag, include if you are using replicates
 # -i input configuration file name
 # -o output evaluation statistics file name
 ```
@@ -142,7 +142,7 @@ python windchime.py -e -i cfg_file.tab -o evaluate_run.txt
 ```
 python windchime.py -r -i ctrl_file.tab
 # -r 'rarefaction' flag
-# [optional] -rep flag, include if you ar using replicates
+# [optional] -rep flag, include if you are using replicates
 # [optional] -tol parameter, allows you to specify the percent tolerance point (default 50)
 # -i input configuration file name
 ```
@@ -157,7 +157,7 @@ UMI an aligned sequence. All rarefaction is calculated using random downsampling
 ```
 python windchime.py -c -i cfg_file.tab -o coverage_run.sh
 # -c 'coverage' flag
-# [optional] -rep flag, include if you ar using replicates
+# [optional] -rep flag, include if you are using replicates
 # [optional] -mem flag, set sbatch memory allocation in GB. (Default 60GB)
 # -i input configuration file name
 # -o output coverage sbatch file name
@@ -171,7 +171,8 @@ sbatch coverage_run.sh
 ```
 python windchime.py -t -i cfg_file.tab -o coverage_table.txt
 # -t 'table' flag
-# [optional] -rep flag, include if you ar using replicates
+# [optional] -rep flag, include if you are using replicates
+# [optional] -avg flag, combines allele counts for diploids (denoted by trailing '_A' and '_B') and returns the mean (ie, A+B/2). 
 # -i input configuration file name
 # -o output combined coverage table file name
 ```
