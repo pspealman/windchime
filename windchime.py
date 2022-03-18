@@ -4,9 +4,7 @@ Created on Wed Aug 11 16:42:11 2021
 
 ver 0.31 - "Enjoy exaggerate" (Public beta) 11.21.2021
     _x_ improved rarefaction plots
-ver 0.32 - "Implicit tail" (Public beta) 01.05.2021
-    _x_ remove mv command
-    _x_ corrected 'strain' error on replicates run
+    _x_ added avg_allele for diploid organisms
 
 Purpose: 
     1. generate a bash script for the preprocessing and alignment of 
@@ -66,7 +64,7 @@ parser.add_argument('-o', '--outfile_name')
 parser.add_argument('-mem', '--mem_in_GB')
 parser.add_argument('-tol', '--set_tolerance')
 parser.add_argument('-rep', '--use_replicates', action='store_true')
-
+parser.add_argument('-avg', '--avg_allele', action='store_true')
 
 # functions
 parser.add_argument('-r', '--rarefaction', action='store_true')
@@ -804,8 +802,11 @@ def parse_coverage_file(tab_file_name, values_dict, gene_list, sample_uid, runmo
                     gene_name = gene_name.split(';')[0]
                     gene_name = gene_name.split(' ')[1]
                     gene_name = gene_name.replace('"','')
-                    
                     value = int(line.split('\t')[9])
+                    
+                    if args.avg_allele:
+                        gene_name = gene_name.rsplit('_',1)[0]
+                        value = round(value/2)
                     
                     if gene_name not in values_dict:
                         values_dict[gene_name] = {}
@@ -835,6 +836,10 @@ def parse_coverage_file(tab_file_name, values_dict, gene_list, sample_uid, runmo
                     gene_name = gene_name.replace('"','')
                     
                     value = int(line.split('\t')[9])
+                    
+                    if args.avg_allele:
+                        gene_name = gene_name.rsplit('_',1)[0]
+                        value = round(value/2)
                     
                     if gene_name not in values_dict:
                         values_dict[gene_name] = {}
