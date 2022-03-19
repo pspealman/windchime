@@ -4,7 +4,7 @@ Created on Wed Aug 11 16:42:11 2021
 
 ver 0.31 - "Enjoy exaggerate" (Public beta) 11.21.2021
     _x_ improved rarefaction plots
-    _x_ added avg_allele for diploid organisms
+    _x_ added avg_allele for multi-allelic genes
 
 Purpose: 
     1. generate a bash script for the preprocessing and alignment of 
@@ -87,8 +87,6 @@ else:
     tol = float(args.set_tolerance)
     if tol > 1:
         tol /= 100
-        
-#
 
 def load_cmd_file():
     if args.inputfile_name:
@@ -790,6 +788,28 @@ def coverage_run(cmd_dict):
     
 def parse_coverage_file(tab_file_name, values_dict, gene_list, sample_uid, runmode):
     if runmode == 'gtf':
+        
+        if args.avg_allele:
+            allele_ct_dict = {}
+            tab_file = open(tab_file_name)
+            for line in tab_file:
+                if line[0] != '#':
+                    line = line.strip()
+                    
+                    if 'transcript' in line.split('\t')[2]:
+                        gene_name = line.split('\t')[8]
+                        gene_name = gene_name.split(';')[0]
+                        gene_name = gene_name.split(' ')[1]
+                        gene_name = gene_name.replace('"','')
+                        gene_name, suffix = gene_name.rsplit('_',1)
+                            
+                        if gene_name not in allele_ct_dict:
+                            allele_ct_dict[gene_name] = set()
+                            
+                        allele_ct_dict[gene_name].add(suffix)
+                        
+            tab_file.close()
+            
         tab_file = open(tab_file_name)
                 
         for line in tab_file:
@@ -806,7 +826,7 @@ def parse_coverage_file(tab_file_name, values_dict, gene_list, sample_uid, runmo
                     
                     if args.avg_allele:
                         gene_name = gene_name.rsplit('_',1)[0]
-                        value = round(value/2)
+                        value = round(value/len(allele_ct_dict[gene_name]))
                     
                     if gene_name not in values_dict:
                         values_dict[gene_name] = {}
@@ -822,6 +842,29 @@ def parse_coverage_file(tab_file_name, values_dict, gene_list, sample_uid, runmo
         return(values_dict, gene_list)
     
     if runmode == 'gff':
+        
+        if args.avg_allele:
+            print('args.avg_allele')
+            allele_ct_dict = {}
+            tab_file = open(tab_file_name)
+            for line in tab_file:
+                if line[0] != '#':
+                    line = line.strip()
+                    
+                    if 'gene' in line.split('\t')[2]:
+                        gene_name = line.split('\t')[8]
+                        gene_name = gene_name.split(';')[0]
+                        gene_name = gene_name.split('ID=')[1]
+                        gene_name = gene_name.replace('"','')
+                        gene_name, suffix = gene_name.rsplit('_',1)
+                            
+                        if gene_name not in allele_ct_dict:
+                            allele_ct_dict[gene_name] = set()
+                            
+                        allele_ct_dict[gene_name].add(suffix)
+                        
+            tab_file.close()
+            
         tab_file = open(tab_file_name)
                 
         for line in tab_file:
@@ -839,7 +882,7 @@ def parse_coverage_file(tab_file_name, values_dict, gene_list, sample_uid, runmo
                     
                     if args.avg_allele:
                         gene_name = gene_name.rsplit('_',1)[0]
-                        value = round(value/2)
+                        value = round(value/len(allele_ct_dict[gene_name]))
                     
                     if gene_name not in values_dict:
                         values_dict[gene_name] = {}
