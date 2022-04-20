@@ -56,7 +56,10 @@ Each table requires the same kinds of run parameters (noted as 'meta' in column 
 * qc_locus - locus coordinates for calculation of rRNA contamination (eg. chromosome:start-stop)
  
   ```
-  for Saccharomyces cerevisiae S288C R64: XII:451439-468985
+  for Saccharomyces cerevisiae S288C 
+  * Ensembl R64: XII:451439-468985
+  * NCBI: NC_001144.5:451410-468977
+                           
   for Candida albicans SC 5314 A22: Ca22chrRA_C_albicans_SC5314:1891108-1896912
   ```
 * sample - unique sample name (if replicates are being used the sample name and replicate ID combined must be unique)
